@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevOps Portfolio — Pipeline Architecture</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0b0f;
+            --bg-card: #12141c;
+            --bg-card-hover: #181b26;
+            --surface: #1a1d2a;
+            --accent: #00e5a0;
+            --accent-dim: #00e5a033;
+            --blue: #4d8eff;
+            --blue-dim: #4d8eff33;
+            --orange: #ff9f43;
+            --orange-dim: #ff9f4333;
+            --red: #ff5c72;
+            --red-dim: #ff5c7233;
+            --purple: #b47aff;
+            --purple-dim: #b47aff33;
+            --cyan: #00d4ff;
+            --cyan-dim: #00d4ff33;
+            --text: #e8eaf0;
+            --text-muted: #6b7089;
+            --border: #252838;
+            --glow: 0 0 30px var(--accent-dim);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Grain overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Mesh background */
+        .bg-mesh {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background:
+                radial-gradient(ellipse 600px 400px at 10% 20%, #00e5a008 0%, transparent 70%),
+                radial-gradient(ellipse 500px 500px at 85% 60%, #4d8eff06 0%, transparent 70%),
+                radial-gradient(ellipse 400px 300px at 50% 90%, #b47aff05 0%, transparent 70%);
+        }
+
+        /* Grid lines */
+        .grid-lines {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+            background-size: 60px 60px;
+            mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black, transparent);
+        }
+
+        /* HEADER */
+        header {
+            padding: 60px 40px 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+            opacity: 0;
+            animation: fadeUp 0.8s ease forwards;
+        }
+
+        .header-tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-tag::before {
+            content: '';
+            width: 24px;
+            height: 1px;
+            background: var(--accent);
+        }
+
+        h1 {
+            font-size: clamp(36px, 5vw, 64px);
+            font-weight: 700;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+            margin-bottom: 16px;
+        }
+
+        h1 span {
+            background: linear-gradient(135deg, var(--accent), var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-desc {
+            font-size: 17px;
+            color: var(--text-muted);
+            max-width: 600px;
+            line-height: 1.6;
+        }
+
+        /* PIPELINE FLOW */
+        .pipeline {
+            padding: 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .pipeline-visual {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            overflow-x: auto;
+            padding: 20px 0;
+            margin-bottom: 60px;
+            scrollbar-width: none;
+        }
+
+        .pipeline-visual::-webkit-scrollbar { display: none; }
+
+        .pipe-node {
+            flex-shrink: 0;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+
+        .pipe-node:hover {
+            border-color: var(--accent);
+            box-shadow: var(--glow);
+            transform: translateY(-2px);
+        }
+
+        .pipe-arrow {
+            flex-shrink: 0;
+            color: var(--text-muted);
+            font-size: 16px;
+            opacity: 0.4;
+        }
+
+        .pipe-node.code { border-color: var(--blue-dim); }
+        .pipe-node.code:hover { border-color: var(--blue); box-shadow: 0 0 30px var(--blue-dim); }
+        .pipe-node.test { border-color: var(--accent-dim); }
+        .pipe-node.test:hover { border-color: var(--accent); box-shadow: 0 0 30px var(--accent-dim); }
+        .pipe-node.deploy { border-color: var(--orange-dim); }
+        .pipe-node.deploy:hover { border-color: var(--orange); box-shadow: 0 0 30px var(--orange-dim); }
+        .pipe-node.monitor { border-color: var(--purple-dim); }
+        .pipe-node.monitor:hover { border-color: var(--purple); box-shadow: 0 0 30px var(--purple-dim); }
+        .pipe-node.secure { border-color: var(--red-dim); }
+        .pipe-node.secure:hover { border-color: var(--red); box-shadow: 0 0 30px var(--red-dim); }
+
+        /* SECTIONS */
+        .sections {
+            padding: 0 40px 80px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .section {
+            margin-bottom: 64px;
+            opacity: 0;
+            animation: fadeUp 0.6s ease forwards;
+        }
+
+        .section:nth-child(1) { animation-delay: 0.2s; }
+        .section:nth-child(2) { animation-delay: 0.3s; }
+        .section:nth-child(3) { animation-delay: 0.4s; }
+        .section:nth-child(4) { animation-delay: 0.5s; }
+        .section:nth-child(5) { animation-delay: 0.6s; }
+        .section:nth-child(6) { animation-delay: 0.7s; }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .section-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .section-icon.code { background: var(--blue-dim); color: var(--blue); }
+        .section-icon.test { background: var(--accent-dim); color: var(--accent); }
+        .section-icon.deploy { background: var(--orange-dim); color: var(--orange); }
+        .section-icon.monitor { background: var(--purple-dim); color: var(--purple); }
+        .section-icon.secure { background: var(--red-dim); color: var(--red); }
+        .section-icon.infra { background: var(--cyan-dim); color: var(--cyan); }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+
+        .section-count {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        /* CARDS GRID */
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .card:hover {
+            background: var(--bg-card-hover);
+            border-color: #2d3148;
+            transform: translateY(-2px);
+        }
+
+        .card:hover::before {
+            opacity: 0.5;
+        }
+
+        .card:focus-within {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .card-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .card-name {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .card-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 4px 8px;
+            border-radius: 6px;
+            white-space: nowrap;
+        }
+
+        .badge-free { background: var(--accent-dim); color: var(--accent); }
+        .badge-oss { background: var(--blue-dim); color: var(--blue); }
+        .badge-core { background: var(--purple-dim); color: var(--purple); }
+        .badge-focus { background: var(--orange-dim); color: var(--orange); }
+
+        .card-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.55;
+            margin-bottom: 16px;
+        }
+
+        .card-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: var(--surface);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+        }
+
+        .card-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 14px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--accent);
+            text-decoration: none;
+            font-family: 'JetBrains Mono', monospace;
+            transition: gap 0.2s ease;
+        }
+
+        .card-link:hover { gap: 10px; }
+
+        .card-link svg {
+            width: 12px;
+            height: 12px;
+            transition: transform 0.2s ease;
+        }
+
+        .card-link:hover svg { transform: translateX(2px); }
+
+        /* FEATURED — Testing Focus */
+        .featured-section {
+            margin-bottom: 64px;
+            opacity: 0;
+            animation: fadeUp 0.6s ease 0.1s forwards;
+        }
+
+        .featured-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .featured-card {
+            background: var(--bg-card);
+            border: 1px solid var(--accent-dim);
+            border-radius: 14px;
+            padding: 28px;
+            transition: all 0.35s ease;
+            position: relative;
+        }
+
+        .featured-card::after {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: 14px;
+            padding: 1px;
+            background: linear-gradient(135deg, var(--accent-dim), transparent, var(--cyan-dim));
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude;
+            -webkit-mask-composite: xor;
+            opacity: 0;
+            transition: opacity 0.35s ease;
+            pointer-events: none;
+        }
+
+        .featured-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 40px rgba(0, 229, 160, 0.08);
+        }
+
+        .featured-card:hover::after { opacity: 1; }
+
+        .featured-num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--accent);
+            opacity: 0.5;
+            margin-bottom: 12px;
+        }
+
+        .featured-name {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            letter-spacing: -0.01em;
+        }
+
+        .featured-role {
+            font-size: 13px;
+            color: var(--accent);
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 12px;
+        }
+
+        .featured-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.55;
+            margin-bottom: 16px;
+        }
+
+        .featured-stats {
+            display: flex;
+            gap: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* FOOTER */
+        footer {
+            padding: 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            opacity: 0;
+            animation: fadeUp 0.6s ease 0.8s forwards;
+        }
+
+        .footer-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 20px;
+        }
+
+        .footer-links a {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .footer-links a:hover { color: var(--accent); }
+
+        /* ANIMATIONS */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(24px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: pulse 2s ease infinite;
+            margin-right: 4px;
+            display: inline-block;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            header, .pipeline, .sections, footer { padding-left: 20px; padding-right: 20px; }
+            .cards { grid-template-columns: 1fr; }
+            .featured-grid { grid-template-columns: 1fr; }
+            .pipeline-visual { margin-bottom: 40px; }
+        }
+
+        /* Scroll reveal utility */
+        .reveal {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-mesh"></div>
+    <div class="grid-lines"></div>
+
+    <header>
+        <div class="header-tag"><span class="live-dot"></span> DevOps Pipeline Portfolio</div>
+        <h1>Infrastructure <span>&amp; Testing</span><br>Architecture</h1>
+        <p class="header-desc">
+            Полный DevOps-стек с акцентом на тестирование. От CI/CD до мониторинга — 
+            каждый инструмент бесплатен и подобран для production-ready портфолио.
+        </p>
+    </header>
+
+    <!-- PIPELINE VISUAL -->
+    <div class="pipeline">
+        <div class="pipeline-visual">
+            <div class="pipe-node code">Source</div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-node test">Static Analysis</div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-node test">Unit Tests</div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-node test">E2E Tests</div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-node test">Visual Regression</div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-node secure">Security Scan</div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-node deploy">Build &amp; Package</div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-node deploy">Deploy</div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-node monitor">Monitor</div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-node monitor">Incident Response</div>
+        </div>
+    </div>
+
+    <div class="sections">
+
+        <!-- TESTING — MAIN FOCUS -->
+        <div class="featured-section">
+            <div class="section-header">
+                <div class="section-icon test">⚡</div>
+                <h2 class="section-title">Testing Pipeline — Основной фокус</h2>
+            </div>
+            <div class="featured-grid">
+                <div class="featured-card">
+                    <div class="featured-num">01</div>
+                    <div class="featured-name">Cypress</div>
+                    <div class="featured-role">E2E Testing Framework</div>
+                    <div class="featured-desc">
+                        E2E-тестирование всего пользовательского пути. Тесты пишутся как пользовательские сценарии 
+                        с time-travel debugging и автоматическими скриншотами при падениях.
+                    </div>
+                    <div class="featured-stats">
+                        <div class="stat">
+                            <span class="stat-value">∞</span>
+                            <span class="stat-label">tests local</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">5</span>
+                            <span class="stat-label">users (dashboard)</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">OSS</span>
+                            <span class="stat-label">free tier</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="featured-card">
+                    <div class="featured-num">02</div>
+                    <div class="featured-name">Keploy</div>
+                    <div class="featured-role">API Test Generation</div>
+                    <div class="featured-desc">
+                        Автоматическая генерация E2E тестов из реальных API-вызовов. 
+                        Записывает KTests и KMocks — революция в тестировании без написания тестов вручную.
+                    </div>
+                    <div class="featured-stats">
+                        <div class="stat">
+                            <span class="stat-value">OSS</span>
+                            <span class="stat-label">free tier</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">API</span>
+                            <span class="stat-label">test gen</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">CI</span>
+                            <span class="stat-label">native</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="featured-card">
+                    <div class="featured-num">03</div>
+                    <div class="featured-name">Percy</div>
+                    <div class="featured-role">Visual Regression</div>
+                    <div class="featured-desc">
+                        Визуальное тестирование — ловит баги, которые пропускают юнит-тесты. 
+                        Сравнивает скриншоты компонентов между деплоями с pixel-level точностью.
+                    </div>
+                    <div class="featured-stats">
+                        <div class="stat">
+                            <span class="stat-value">5K</span>
+                            <span class="stat-label">snapshots/mo</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">∞</span>
+                            <span class="stat-label">projects</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">∞</span>
+                            <span class="stat-label">team members</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="featured-card">
+                    <div class="featured-num">04</div>
+                    <div class="featured-name">Bencher</div>
+                    <div class="featured-role">Continuous Benchmarking</div>
+                    <div class="featured-desc">
+                        Ловит performance-регрессии до деплоя. Интеграция в CI — бенчмарки запускаются 
+                        на каждый PR и показывают тренд производительности.
+                    </div>
+                    <div class="featured-stats">
+                        <div class="stat">
+                            <span class="stat-value">∞</span>
+                            <span class="stat-label">public projects</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">CI</span>
+                            <span class="stat-label">integrated</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">OSS</span>
+                            <span class="stat-label">free</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="featured-card">
+                    <div class="featured-num">05</div>
+                    <div class="featured-name">Checkly</div>
+                    <div class="featured-role">Synthetic Monitoring</div>
+                    <div class="featured-desc">
+                        Код-фёрст мониторинг на Playwright. Пишешь тесты как код — 
+                        они же работают как мониторинг продакшена 24/7 из нескольких регионов.
+                    </div>
+                    <div class="featured-stats">
+                        <div class="stat">
+                            <span class="stat-value">10K</span>
+                            <span class="stat-label">API checks/mo</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">1.5K</span>
+                            <span class="stat-label">browser checks</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">IaC</span>
+                            <span class="stat-label">workflow</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="featured-card">
+                    <div class="featured-num">06</div>
+                    <div class="featured-name">Buildkite</div>
+                    <div class="featured-role">CI/CD + Test Analytics</div>
+                    <div class="featured-desc">
+                        Test Analytics — отдельный инструмент для анализа падающих тестов. 
+                        Автоматически определяет flaky tests и показывает тренды по suites.
+                    </div>
+                    <div class="featured-stats">
+                        <div class="stat">
+                            <span class="stat-value">5K</span>
+                            <span class="stat-label">job min/mo</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">100K</span>
+                            <span class="stat-label">test runs/mo</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value">3</span>
+                            <span class="stat-label">users</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CODE + CI/CD -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-icon code">⟨/⟩</div>
+                <h2 class="section-title">Source Control &amp; CI/CD</h2>
+                <span class="section-count">4 tools</span>
+            </div>
+            <div class="cards">
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">GitHub</div>
+                        <span class="card-badge badge-core">Core</span>
+                    </div>
+                    <div class="card-desc">
+                        Репозиторий + Actions. Unlimited public/private repos, CI/CD pipelines, 
+                        Packages registry, Pages для статики. Основа всего pipeline.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">Git</span>
+                        <span class="tag">Actions</span>
+                        <span class="tag">Packages</span>
+                        <span class="tag">Pages</span>
+                    </div>
+                    <a href="https://github.com" target="_blank" class="card-link">
+                        github.com <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">SonarCloud</div>
+                        <span class="card-badge badge-free">Free</span>
+                    </div>
+                    <div class="card-desc">
+                        Статический анализ кода: баги, уязвимости, code smell. 
+                        Интеграция прямо в PR — каждое изменение проверяется автоматически.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">SAST</span>
+                        <span class="tag">Quality Gate</span>
+                        <span class="tag">25+ языков</span>
+                    </div>
+                    <a href="https://sonarcloud.io" target="_blank" class="card-link">
+                        sonarcloud.io <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">CircleCI</div>
+                        <span class="card-badge badge-free">Free</span>
+                    </div>
+                    <div class="card-desc">
+                        Мощный CI/CD с test splitting, Docker Layer Caching, 
+                        и 6000 free minutes/month. Отлично показывает навыки работы с parallel pipelines.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">6K min/mo</span>
+                        <span class="tag">Docker</span>
+                        <span class="tag">ARM</span>
+                        <span class="tag">Test Splitting</span>
+                    </div>
+                    <a href="https://circleci.com" target="_blank" class="card-link">
+                        circleci.com <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">Pulumi</div>
+                        <span class="card-badge badge-oss">IaC</span>
+                    </div>
+                    <div class="card-desc">
+                        Infrastructure as Code на Python/TypeScript/Go. 
+                        Бесплатный managed backend для state. В портфолио показывает навыки облачной архитектуры.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">Terraform alt</span>
+                        <span class="tag">Multi-cloud</span>
+                        <span class="tag">Any language</span>
+                    </div>
+                    <a href="https://pulumi.com" target="_blank" class="card-link">
+                        pulumi.com <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- HOSTING -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-icon deploy">☁</div>
+                <h2 class="section-title">Hosting &amp; Compute</h2>
+                <span class="section-count">4 tools</span>
+            </div>
+            <div class="cards">
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">Oracle Cloud Free</div>
+                        <span class="card-badge badge-focus">Always Free</span>
+                    </div>
+                    <div class="card-desc">
+                        4 ARM-ядра + 24GB RAM + 200GB storage — навсегда. 
+                        Идеально для Docker Swarm / K3s кластера в портфолио. 
+                        Показывает умение работать с bare-metal инфраструктурой.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">4 cores ARM</span>
+                        <span class="tag">24GB RAM</span>
+                        <span class="tag">200GB SSD</span>
+                        <span class="tag">10TB egress</span>
+                    </div>
+                    <a href="https://www.oracle.com/cloud/free/" target="_blank" class="card-link">
+                        oracle.com/cloud/free <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">Vercel</div>
+                        <span class="card-badge badge-free">Free</span>
+                    </div>
+                    <div class="card-desc">
+                        Хостинг фронтенда с автоматическим деплоем из Git. 
+                        SSL, CDN, Preview URLs для каждого PR. Perfect для Next.js проектов.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">Edge Functions</span>
+                        <span class="tag">Preview</span>
+                        <span class="tag">SSL</span>
+                        <span class="tag">CDN</span>
+                    </div>
+                    <a href="https://vercel.com" target="_blank" class="card-link">
+                        vercel.com <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">Cloudflare Pages</div>
+                        <span class="card-badge badge-free">Free</span>
+                    </div>
+                    <div class="card-desc">
+                        500 builds/month, unlimited bandwidth, Workers интеграция. 
+                        Плюс Workers KV и D1 database для full-stack проектов.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">500 builds/mo</span>
+                        <span class="tag">Unlimited BW</span>
+                        <span class="tag">Workers</span>
+                        <span class="tag">D1 DB</span>
+                    </div>
+                    <a href="https://pages.cloudflare.com" target="_blank" class="card-link">
+                        pages.cloudflare.com <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">Render</div>
+                        <span class="card-badge badge-free">Free</span>
+                    </div>
+                    <div class="card-desc">
+                        PaaS с free tier для web services, databases и static sites. 
+                        Auto-deploy из Git, free PostgreSQL, private networks.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">Web Services</span>
+                        <span class="tag">PostgreSQL</span>
+                        <span class="tag">Docker</span>
+                        <span class="tag">Auto SSL</span>
+                    </div>
+                    <a href="https://render.com" target="_blank" class="card-link">
+                        render.com <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- MONITORING -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-icon monitor">◎</div>
+                <h2 class="section-title">Monitoring &amp; Observability</h2>
+                <span class="section-count">4 tools</span>
+            </div>
+            <div class="cards">
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">Grafana Cloud</div>
+                        <span class="card-badge badge-free">Free</span>
+                    </div>
+                    <div class="card-desc">
+                        Метрики (Prometheus), логи (Loki), трейсы — всё в одном. 
+                        10K series, 50GB logs, 10 dashboards. Стандарт индустрии.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">Metrics</span>
+                        <span class="tag">Logs</span>
+                        <span class="tag">Traces</span>
+                        <span class="tag">Alerts</span>
+                    </div>
+                    <a href="https://grafana.com/cloud/" target="_blank" class="card-link">
+                        grafana.com <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">Sentry</div>
+                        <span class="card-badge badge-oss">OSS</span>
+                    </div>
+                    <div class="card-desc">
+                        Трекинг ошибок с full stack traces, breadcrumbs, release tracking. 
+                        Показывает падение сессий, affected users, и интегрируется с Git.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">5K errors/mo</span>
+                        <span class="tag">Stack Traces</span>
+                        <span class="tag">Releases</span>
+                        <span class="tag">Breadcrumbs</span>
+                    </div>
+                    <a href="https://sentry.io" target="_blank" class="card-link">
+                        sentry.io <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">Better Stack</div>
+                        <span class="card-badge badge-free">Free</span>
+                    </div>
+                    <div class="card-desc">
+                        Uptime мониторинг + incident management + status page. 
+                        10 мониторов, 3-min checks, красивая публичная status page.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">10 monitors</span>
+                        <span class="tag">Status Page</span>
+                        <span class="tag">On-call</span>
+                        <span class="tag">3-min checks</span>
+                    </div>
+                    <a href="https://betterstack.com" target="_blank" class="card-link">
+                        betterstack.com <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">Logtail</div>
+                        <span class="card-badge badge-free">Free</span>
+                    </div>
+                    <div class="card-desc">
+                        SQL-совместимое логирование на ClickHouse. 1GB/month, 
+                        3 дня ретеншн. Быстрее и дешевле традиционных log management решений.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">1GB/mo</span>
+                        <span class="tag">SQL queries</span>
+                        <span class="tag">ClickHouse</span>
+                    </div>
+                    <a href="https://logtail.com" target="_blank" class="card-link">
+                        logtail.com <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECURITY -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-icon secure">🛡</div>
+                <h2 class="section-title">Security &amp; Secrets</h2>
+                <span class="section-count">3 tools</span>
+            </div>
+            <div class="cards">
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">GitGuardian</div>
+                        <span class="card-badge badge-core">Security</span>
+                    </div>
+                    <div class="card-desc">
+                        Автоматический поиск секретов в коде: API keys, passwords, tokens. 
+                        350+ типов секретов. PR checks — секреты не попадут в репозиторий.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">Secret Detection</span>
+                        <span class="tag">350+ patterns</span>
+                        <span class="tag">PR Checks</span>
+                    </div>
+                    <a href="https://gitguardian.com" target="_blank" class="card-link">
+                        gitguardian.com <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">Infisical</div>
+                        <span class="card-badge badge-oss">OSS</span>
+                    </div>
+                    <div class="card-desc">
+                        Open-source secrets management. Синхронизация между dev/staging/prod, 
+                        интеграция с CI/CD, auto-rotation. Альтернатива HashiCorp Vault.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">5 devs</span>
+                        <span class="tag">CI/CD sync</span>
+                        <span class="tag">Self-hostable</span>
+                    </div>
+                    <a href="https://infisical.com" target="_blank" class="card-link">
+                        infisical.com <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">Socket</div>
+                        <span class="card-badge badge-oss">OSS</span>
+                    </div>
+                    <div class="card-desc">
+                        Supply chain security — защита от вредоносных npm/pip пакетов. 
+                        70+ индикаторов риска. Против CVE в зависимостях.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">Supply Chain</span>
+                        <span class="tag">npm</span>
+                        <span class="tag">70+ signals</span>
+                        <span class="tag">Firewall CLI</span>
+                    </div>
+                    <a href="https://socket.dev" target="_blank" class="card-link">
+                        socket.dev <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- EXTRAS -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-icon infra">⬡</div>
+                <h2 class="section-title">Bonus: Feature Flags &amp; Data</h2>
+                <span class="section-count">3 tools</span>
+            </div>
+            <div class="cards">
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">GrowthBook</div>
+                        <span class="card-badge badge-oss">OSS</span>
+                    </div>
+                    <div class="card-desc">
+                        Feature flags + A/B testing. Open-source, self-hostable. 
+                        Bayesian stats engine, Git-style version control. Показывает навыки progressive delivery.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">Feature Flags</span>
+                        <span class="tag">A/B Testing</span>
+                        <span class="tag">3 users free</span>
+                    </div>
+                    <a href="https://growthbook.io" target="_blank" class="card-link">
+                        growthbook.io <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">Neon</div>
+                        <span class="card-badge badge-free">Free</span>
+                    </div>
+                    <div class="card-desc">
+                        Serverless PostgreSQL с branch-based workflow. 
+                        Автосуспенд, 0.5GB storage, branching для тестовых данных.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">PostgreSQL</span>
+                        <span class="tag">Branching</span>
+                        <span class="tag">Serverless</span>
+                    </div>
+                    <a href="https://neon.tech" target="_blank" class="card-link">
+                        neon.tech <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+
+                <div class="card">
+                    <div class="card-top">
+                        <div class="card-name">Upstash</div>
+                        <span class="card-badge badge-free">Free</span>
+                    </div>
+                    <div class="card-desc">
+                        Serverless Redis. 500K commands/mo, 256MB. 
+                        Perfect для кэширования, rate limiting, queues в serverless архитектуре.
+                    </div>
+                    <div class="card-meta">
+                        <span class="tag">Redis</span>
+                        <span class="tag">500K cmd/mo</span>
+                        <span class="tag">256MB</span>
+                        <span class="tag">Serverless</span>
+                    </div>
+                    <a href="https://upstash.com" target="_blank" class="card-link">
+                        upstash.com <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6v6M10 2L4 8"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <footer>
+        <span class="footer-text">DevOps Portfolio · 18 tools · All free tiers · Built for testing excellence</span>
+        <div class="footer-links">
+            <a href="https://github.com" target="_blank">GitHub</a>
+            <a href="https://cloud.google.com/free" target="_blank">GCP Free</a>
+            <a href="https://aws.amazon.com/free/" target="_blank">AWS Free</a>
+        </div>
+    </footer>
+
+    <script>
+        // Intersection Observer for scroll reveal
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.card, .featured-card').forEach(el => {
+            observer.observe(el);
+        });
+
+        // Pipeline animation — sequential glow
+        const pipeNodes = document.querySelectorAll('.pipe-node');
+        let currentPipe = 0;
+
+        function animatePipeline() {
+            pipeNodes.forEach(node => node.style.borderColor = '');
+            if (currentPipe < pipeNodes.length) {
+                const node = pipeNodes[currentPipe];
+                const color = getComputedStyle(node).borderColor;
+                node.style.borderColor = 'var(--accent)';
+                node.style.boxShadow = '0 0 20px var(--accent-dim)';
+                setTimeout(() => {
+                    node.style.boxShadow = '';
+                }, 400);
+                currentPipe++;
+            } else {
+                currentPipe = 0;
+            }
+        }
+
+        setInterval(animatePipeline, 600);
+    </script>
+</body>
+</html>
