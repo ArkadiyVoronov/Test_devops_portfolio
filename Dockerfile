@@ -1,12 +1,14 @@
-# Используем легкий образ Nginx
 FROM nginx:alpine
 
-# Копируем ваш HTML файл внутрь контейнера
-# По умолчанию Nginx ищет файлы в папке /usr/share/nginx/html
+# Копируем конфиг с настройкой gzip и кэширования (опционально)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Копируем статику
 COPY index.html /usr/share/nginx/html/index.html
 
-# Открываем порт 80
-EXPOSE 80
+# Health check для Kubernetes
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost:80/ || exit 1
 
-# Запускаем Nginx
+EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
