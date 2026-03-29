@@ -1,14 +1,20 @@
-# Test_devops_portfolio
+# 🚀 Test_devops_portfolio
 
-> DevOps Portfolio — Pipeline Architecture with Kubernetes Deployment
+> DevOps Portfolio — Pipeline Architecture (Build-First Approach)
 
-[![Build & Deploy](https://github.com/ArkadiyVoronov/Test_devops_portfolio/actions/workflows/deploy.yml/badge.svg)](https://github.com/ArkadiyVoronov/Test_devops_portfolio/actions)
+[![Build & Publish](https://github.com/ArkadiyVoronov/Test_devops_portfolio/actions/workflows/build.yml/badge.svg)](https://github.com/ArkadiyVoronov/Test_devops_portfolio/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## 🚀 Быстрый старт
+## 📦 Образы
 
-### Локально через Docker
+Собранные образы публикуются в **GitHub Container Registry**:
+
 ```bash
-docker build -t portfolio:latest .
-docker run -p 8080:80 portfolio:latest
-# Откройте http://localhost:8080
+# Latest (main branch)
+docker pull ghcr.io/arkadiyvoronov/test_devops_portfolio:latest
+
+# По коммиту
+docker pull ghcr.io/arkadiyvoronov/test_devops_portfolio:sha-<full-sha>
+
+# По тегу (v1.0.0)
+docker pull ghcr.io/arkadiyvoronov/test_devops_portfolio:1.0.0
