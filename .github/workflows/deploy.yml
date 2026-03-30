@@ -12,7 +12,7 @@ env:
   # Меняем реестр на Docker Hub
   REGISTRY: docker.io
   # Формат имени для Docker Hub: username/repo (без ghcr.io/)
-  IMAGE_NAME: ${{ github.repository_owner }}/Test_devops_portfolio  # 👈 ПОМЕНЯЙ 'my-site' на имя репозитория на Docker Hub
+  IMAGE_NAME: ${{ github.repository_owner }}/Test_devops_portfolio  
 
 jobs:
   build-and-push:
