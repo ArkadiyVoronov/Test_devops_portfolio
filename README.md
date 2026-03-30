@@ -2,19 +2,23 @@
 
 > DevOps Portfolio — Pipeline Architecture (Build-First Approach)
 
-[![Build & Publish](https://github.com/ArkadiyVoronov/Test_devops_portfolio/actions/workflows/build.yml/badge.svg)](https://github.com/ArkadiyVoronov/Test_devops_portfolio/actions)
+[![Docker Pulls](https://img.shields.io/docker/pulls/arkadiyvoronov/test_devops_portfolio)](https://hub.docker.com/r/arkadiyvoronov/test_devops_portfolio)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## 📦 Образы
+---
 
-Собранные образы публикуются в **GitHub Container Registry**:
+## 📦 Docker-образ
+
+Проект собирается в Docker-образ и публикуется в **Docker Hub** автоматически через GitHub Actions.
+
+### 📥 Pull образы
 
 ```bash
-# Latest (main branch)
-docker pull ghcr.io/arkadiyvoronov/test_devops_portfolio:latest
+# Latest версия (собирается при пуше в main)
+docker pull arkadiyvoronov/test_devops_portfolio:latest
 
-# По коммиту
-docker pull ghcr.io/arkadiyvoronov/test_devops_portfolio:sha-<full-sha>
+# По коммиту (SHA)
+docker pull arkadiyvoronov/test_devops_portfolio:sha-<full-sha>
 
-# По тегу (v1.0.0)
-docker pull ghcr.io/arkadiyvoronov/test_devops_portfolio:1.0.0
+# По тегу (например, v1.0.0)
+docker pull arkadiyvoronov/test_devops_portfolio:1.0.0
